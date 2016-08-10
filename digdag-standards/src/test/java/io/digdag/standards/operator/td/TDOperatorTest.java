@@ -105,7 +105,22 @@ public class TDOperatorTest
                         .set("password", "'(#%")
                         .set("use_ssl", true));
 
-        TDClientBuilder builder = TDClientFactory.clientBuilderFromConfig(config);
+        TDClientBuilder builder = TDClientFactory.clientBuilderFromConfig(config, ImmutableMap.of());
+        TDClientConfig clientConfig = builder.buildConfig();
+
+        assertThat(clientConfig.proxy.get().getUser(), is(Optional.of("me")));
+        assertThat(clientConfig.proxy.get().getPassword(), is(Optional.of("'(#%")));
+        assertThat(clientConfig.proxy.get().getUri(), is(URI.create("https://example.com:9119")));
+    }
+
+    @Test
+    public void testProxyConfigFromEnv()
+    {
+        Map<String, String> env = ImmutableMap.of("http_proxy", "https://me:%27(%23%25@example.com:9119");
+        Config config = newConfig()
+                .set("apikey", "foobar");
+
+        TDClientBuilder builder = TDClientFactory.clientBuilderFromConfig(config, env);
         TDClientConfig clientConfig = builder.buildConfig();
 
         assertThat(clientConfig.proxy.get().getUser(), is(Optional.of("me")));

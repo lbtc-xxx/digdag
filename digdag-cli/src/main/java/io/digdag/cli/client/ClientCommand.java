@@ -2,6 +2,8 @@ package io.digdag.cli.client;
 
 import com.beust.jcommander.DynamicParameter;
 import com.beust.jcommander.Parameter;
+import com.google.common.base.Optional;
+import com.treasuredata.client.ProxyConfig;
 import io.digdag.cli.Command;
 import io.digdag.cli.Main;
 import io.digdag.cli.SystemExitException;
@@ -9,6 +11,7 @@ import io.digdag.cli.YamlMapper;
 import io.digdag.client.DigdagClient;
 import io.digdag.core.Version;
 
+import io.digdag.standards.Proxies;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -101,6 +104,7 @@ public abstract class ClientCommand
     protected DigdagClient buildClient(boolean checkServerVersion)
             throws IOException, SystemExitException
     {
+
         // load config file
         Properties props = loadSystemProperties();
 
@@ -147,12 +151,24 @@ public abstract class ClientCommand
 
         logger.debug("Using endpoint {}://{}:{}", useSsl ? "https" : "http", host, port);
 
-        DigdagClient client = DigdagClient.builder()
+        DigdagClient.Builder builder = DigdagClient.builder()
                 .host(host)
                 .port(port)
                 .ssl(useSsl)
-                .headers(headers)
-                .build();
+                .headers(headers);
+
+        Optional<ProxyConfig> proxyConfig = Proxies.proxyConfigFromEnv(System.getenv());
+        if (proxyConfig.isPresent()) {
+            ProxyConfig cfg = proxyConfig.get();
+            if (cfg.getUser().isPresent() || cfg.getPassword().isPresent()) {
+                logger.warn("HTTP proxy authentication not supported. Ignoring proxy username and password.");
+            }
+            builder.proxyHost(cfg.getHost());
+            builder.proxyPort(cfg.getPort());
+            builder.proxyScheme(cfg.useSSL() ? "https" : "http");
+        }
+
+        DigdagClient client = builder.build();
 
         if (checkServerVersion && !disableVersionCheck) {
             Map<String, Object> remoteVersions = client.getVersion();

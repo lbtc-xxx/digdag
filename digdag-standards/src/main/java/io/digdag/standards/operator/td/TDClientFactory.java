@@ -1,17 +1,24 @@
 package io.digdag.standards.operator.td;
 
-import com.google.common.base.Optional;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Optional;
 import com.treasuredata.client.ProxyConfig;
 import com.treasuredata.client.TDClient;
 import com.treasuredata.client.TDClientBuilder;
 import io.digdag.client.config.Config;
 import io.digdag.client.config.ConfigException;
+import io.digdag.standards.Proxies;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.Map;
+
+import static org.jboss.resteasy.util.Encode.decode;
 
 class TDClientFactory
 {
     @VisibleForTesting
-    static TDClientBuilder clientBuilderFromConfig(Config params)
+    static TDClientBuilder clientBuilderFromConfig(Config params, Map<String, String> env)
     {
         String apikey = params.get("apikey", String.class).trim();
         if (apikey.isEmpty()) {
@@ -25,6 +32,12 @@ class TDClientFactory
         if (proxyEnabled) {
             builder.setProxy(proxyConfig(proxyConfig));
         }
+        else {
+            Optional<ProxyConfig> config = Proxies.proxyConfigFromEnv(env);
+            if (config.isPresent()) {
+                builder.setProxy(config.get());
+            }
+        }
 
         return builder
                 .setEndpoint(params.get("endpoint", String.class, "api.treasuredata.com"))
@@ -36,7 +49,7 @@ class TDClientFactory
 
     static TDClient clientFromConfig(Config params)
     {
-        return clientBuilderFromConfig(params).build();
+        return clientBuilderFromConfig(params, System.getenv()).build();
     }
 
     private static ProxyConfig proxyConfig(Config config)

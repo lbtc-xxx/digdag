@@ -24,7 +24,10 @@ import io.digdag.client.api.RestWorkflowSessionTime;
 import io.digdag.client.api.SessionTimeTruncate;
 import io.digdag.client.config.Config;
 import io.digdag.client.config.ConfigFactory;
+import org.jboss.resteasy.client.jaxrs.ClientHttpEngine;
+import org.jboss.resteasy.client.jaxrs.ResteasyClient;
 import org.jboss.resteasy.client.jaxrs.ResteasyClientBuilder;
+import org.jboss.resteasy.client.jaxrs.engines.ApacheHttpClient4Engine;
 
 import javax.ws.rs.NotFoundException;
 import javax.ws.rs.client.Client;
@@ -56,6 +59,9 @@ public class DigdagClient implements AutoCloseable
         private String host = null;
         private int port = -1;
         private boolean ssl = false;
+        private String proxyHost = null;
+        private Integer proxyPort = null;
+        private String proxyScheme = null;
         private final Map<String, String> baseHeaders = new HashMap<>();
         private Function<Map<String, String>, Map<String, String>> headerBuilder = null;
 
@@ -74,6 +80,24 @@ public class DigdagClient implements AutoCloseable
         public Builder ssl(boolean ssl)
         {
             this.ssl = ssl;
+            return this;
+        }
+
+        public Builder proxyHost(String proxyHost)
+        {
+            this.proxyHost = proxyHost;
+            return this;
+        }
+
+        public Builder proxyPort(int proxyPort)
+        {
+            this.proxyPort = proxyPort;
+            return this;
+        }
+
+        public Builder proxyScheme(String proxyScheme)
+        {
+            this.proxyScheme = proxyScheme;
             return this;
         }
 
@@ -164,9 +188,24 @@ public class DigdagClient implements AutoCloseable
 
         ObjectMapper mapper = objectMapper();
 
-        this.client = new ResteasyClientBuilder()
-            .register(new JacksonJsonProvider(mapper))
-            .build();
+        ResteasyClientBuilder clientBuilder = new ResteasyClientBuilder()
+                .register(new JacksonJsonProvider(mapper));
+
+        // TODO: support proxy user/pass
+        if (builder.proxyHost != null) {
+            if (builder.proxyPort == null) {
+                clientBuilder.defaultProxy(builder.proxyHost);
+            } else {
+                if (builder.proxyScheme == null) {
+                    clientBuilder.defaultProxy(builder.proxyHost, builder.proxyPort);
+                } else {
+                    clientBuilder.defaultProxy(builder.proxyHost, builder.proxyPort, builder.proxyScheme);
+                }
+            }
+        }
+
+        this.client = clientBuilder.build();
+
         this.cf = new ConfigFactory(mapper);
     }
 
